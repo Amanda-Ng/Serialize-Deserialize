@@ -221,5 +221,78 @@ int deserialize() {
 int validargs(int argc, char **argv)
 {
     // To be implemented.
-    abort();
+    // abort();
+
+    global_options = 0;
+
+    if (argc == 1) {
+        return -1;  // No arguments, invalid case
+    }
+
+    char *arg = argv[1];
+
+    // Check if the first argument is "-h"
+    if (*arg == '-' && *(arg + 1) == 'h') {
+        global_options = 0x1;  // Set help flag
+        return 0;
+    }
+
+    int serialize = 0;
+    int deserialize = 0;
+    int clobber = 0;
+    int positional_done = 0;  // Track if we've passed positional arguments
+
+    for (int i = 1; i < argc; i++) {
+        arg = argv[i];
+
+        if (*arg != '-') {
+            return -1;  // All arguments must start with '-'
+        }
+
+        arg++;  // Skip the '-'
+
+        // Handle positional arguments
+        if (*arg == 's' && *(arg + 1) == '\0') {
+            if (positional_done) return -1;  // No more positional args after options
+            serialize = 1;
+        } else if (*arg == 'd' && *(arg + 1) == '\0') {
+            if (positional_done) return -1;
+            deserialize = 1;
+        } else if (*arg == 'c' && *(arg + 1) == '\0') {
+            positional_done = 1;  // Options have started, no more positional args
+            clobber = 1;
+        } else if (*arg == 'p') {
+            positional_done = 1;  // Options have started
+            if (i + 1 < argc && *argv[i + 1] != '-') {
+                i++;  // Skip the directory argument
+            } else {
+                return -1;  // If -p is provided but no directory is specified, invalid
+            }
+        } else {
+            return -1;  // Unrecognized argument
+        }
+    }
+
+    // Enforce -s or -d must be present, but not both
+    if ((serialize && deserialize) || (!serialize && !deserialize)) {
+        return -1;
+    }
+
+    // -c (clobber) is only valid if -d (deserialize) is set
+    if (clobber && !deserialize) {
+        return -1;
+    }
+
+    // Set global_options based on parsed arguments
+    if (serialize) {
+        global_options |= 0x2;  // Set serialize flag
+    }
+    if (deserialize) {
+        global_options |= 0x4;  // Set deserialize flag
+    }
+    if (clobber) {
+        global_options |= 0x8;  // Set clobber flag
+    }
+
+    return 0;
 }
