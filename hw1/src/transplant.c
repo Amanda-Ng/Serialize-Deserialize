@@ -45,7 +45,24 @@
  */
 int path_init(char *name) {
     // To be implemented.
-    abort();
+    // abort();
+    char *src = name;
+    char *dst = path_buf;
+    path_length = 0;
+
+    // Copy the string from `name` into `path_buf`
+    while (*src != '\0') {
+        if (path_length >= PATH_MAX - 1) {  // Ensure enough space for null terminator
+            return -1;  // Error: String too long to fit in path_buf
+        }
+        *dst = *src;  // Copy character from name to path_buf
+        dst++;
+        src++;
+        path_length++;
+    }
+
+    *dst = '\0';  // Null-terminate path_buf
+    return 0;  // Success
 }
 
 /*
@@ -63,7 +80,35 @@ int path_init(char *name) {
  */
 int path_push(char *name) {
     // To be implemented.
-    abort();
+    // abort();
+    char *dst = path_buf + path_length;
+
+    // Add '/' if not already at the end
+    if (path_length > 0 && *(dst - 1) != '/') {
+        if (path_length >= PATH_MAX - 1) {  // Ensure space for '/'
+            return -1;  // Error: Not enough space to append '/'
+        }
+        *dst = '/';
+        dst++;
+        path_length++;
+    }
+
+    // Append the new component from `name`
+    while (*name != '\0') {
+        if (*name == '/') {
+            return -1;  // Error: name contains '/'
+        }
+        if (path_length >= PATH_MAX - 1) {  // Ensure enough space for the full name and null terminator
+            return -1;  // Error: Not enough space to append
+        }
+        *dst = *name;
+        dst++;
+        name++;
+        path_length++;
+    }
+
+    *dst = '\0';  // Null-terminate the new path_buf
+    return 0;  // Success
 }
 
 /*
@@ -80,7 +125,29 @@ int path_push(char *name) {
  */
 int path_pop() {
     // To be implemented.
-    abort();
+    // abort();
+    if (path_length == 0) {
+        return -1;  // Error: path_buf is empty
+    }
+
+    char *ptr = path_buf + path_length - 1;
+
+    // Move backwards to find the last '/'
+    while (ptr >= path_buf && *ptr != '/') {
+        ptr--;
+    }
+
+    if (ptr < path_buf) {
+        // No '/' found, clear the entire path
+        path_length = 0;
+        *path_buf = '\0';  // Set path_buf to empty string
+    } else {
+        // Null-terminate at the found '/' to remove the last component
+        *ptr = '\0';
+        path_length = ptr - path_buf;  // Update path_length
+    }
+
+    return 0;  // Success
 }
 
 /*
@@ -223,76 +290,85 @@ int validargs(int argc, char **argv)
     // To be implemented.
     // abort();
 
+    // Set global_options to 0 initially
     global_options = 0;
 
+    // If there are no command-line arguments passed, return an error
     if (argc == 1) {
-        return -1;  // No arguments, invalid case
+        return -1;  // No arguments provided
     }
 
-    char *arg = argv[1];
+    // Use pointer arithmetic to access the first argument
+    char *arg = *(argv + 1);
 
     // Check if the first argument is "-h"
     if (*arg == '-' && *(arg + 1) == 'h') {
         global_options = 0x1;  // Set help flag
-        return 0;
+        return 0;  // Success
     }
 
+    // Variables to track the presence of each argument
     int serialize = 0;
     int deserialize = 0;
     int clobber = 0;
-    int positional_done = 0;  // Track if we've passed positional arguments
+    int positional_done = 0;  // Track if positional arguments have been processed
 
-    for (int i = 1; i < argc; i++) {
-        arg = argv[i];
+    // Loop through all the arguments using pointer arithmetic
+    for (char **arg_ptr = argv + 1; arg_ptr < argv + argc; arg_ptr++) {
+        arg = *arg_ptr;  // Current argument
 
         if (*arg != '-') {
-            return -1;  // All arguments must start with '-'
+            return -1;  // Invalid argument (must start with '-')
         }
 
         arg++;  // Skip the '-'
 
         // Handle positional arguments
         if (*arg == 's' && *(arg + 1) == '\0') {
-            if (positional_done) return -1;  // No more positional args after options
+            if (positional_done) {
+                return -1;  // No positional arguments allowed after options
+            }
             serialize = 1;
         } else if (*arg == 'd' && *(arg + 1) == '\0') {
-            if (positional_done) return -1;
+            if (positional_done) {
+                return -1;
+            }
             deserialize = 1;
         } else if (*arg == 'c' && *(arg + 1) == '\0') {
-            positional_done = 1;  // Options have started, no more positional args
+            positional_done = 1;  // Options have started, no more positional arguments
             clobber = 1;
         } else if (*arg == 'p') {
             positional_done = 1;  // Options have started
-            if (i + 1 < argc && *argv[i + 1] != '-') {
-                i++;  // Skip the directory argument
+            if (arg_ptr + 1 < argv + argc && **(arg_ptr + 1) != '-') {
+                arg_ptr++;  // Skip the directory argument
             } else {
-                return -1;  // If -p is provided but no directory is specified, invalid
+                return -1;  // '-p' provided but no directory argument
             }
         } else {
             return -1;  // Unrecognized argument
         }
     }
 
-    // Enforce -s or -d must be present, but not both
+    // Enforce that either '-s' or '-d' must be provided, but not both
     if ((serialize && deserialize) || (!serialize && !deserialize)) {
         return -1;
     }
 
-    // -c (clobber) is only valid if -d (deserialize) is set
+    // '-c' (clobber) is only valid if '-d' (deserialize) is provided
     if (clobber && !deserialize) {
         return -1;
     }
 
-    // Set global_options based on parsed arguments
+    // Set global_options based on the parsed arguments
     if (serialize) {
-        global_options |= 0x2;  // Set serialize flag
+        global_options |= 0x2;  // Set the serialize flag
     }
     if (deserialize) {
-        global_options |= 0x4;  // Set deserialize flag
+        global_options |= 0x4;  // Set the deserialize flag
     }
     if (clobber) {
-        global_options |= 0x8;  // Set clobber flag
+        global_options |= 0x8;  // Set the clobber flag
     }
 
-    return 0;
+    return 0;  // Success
 }
