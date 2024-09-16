@@ -18,13 +18,57 @@
 
 int main(int argc, char **argv)
 {
-    int ret;
-    if(validargs(argc, argv))
-        USAGE(*argv, EXIT_FAILURE);
-    if(global_options & 0x1)
-        USAGE(*argv, EXIT_SUCCESS);
+    // int ret;
+    // if(validargs(argc, argv))
+    //     USAGE(*argv, EXIT_FAILURE);
+    // if(global_options & 0x1)
+    //     USAGE(*argv, EXIT_SUCCESS);
 
-    return EXIT_SUCCESS;
+    // return EXIT_SUCCESS;
+
+
+
+// CURRENT IMPLEMENTATION
+    int ret = validargs(argc, argv);
+
+    if (ret == -1) {
+        USAGE(*argv, EXIT_FAILURE);  // Print usage message and exit with failure status
+        return EXIT_FAILURE;         // This line will not be reached but ensures proper exit status
+    } else if (global_options & 0x1) {
+        USAGE(*argv, EXIT_SUCCESS);  // Print usage message and exit with success status for -h flag
+        return EXIT_SUCCESS;         // This line will not be reached but ensures proper exit status
+    } else {
+        // Perform serialization or deserialization
+        if (global_options & 0x2) {
+            // Perform serialization
+            if (serialize()) {
+                return EXIT_FAILURE;  // Return failure status if serialization fails
+            }
+        } else if (global_options & 0x4) {
+            // Perform deserialization
+            if (deserialize()) {
+                return EXIT_FAILURE;  // Return failure status if deserialization fails
+            }
+        }
+        // If you reach this point, the operation was successful
+        return EXIT_SUCCESS;
+    }
+
+
+
+// TODO: DELETE (TEST VALIDARGS)
+    // int ret;
+    // ret = validargs(argc, argv);  // Call validargs and capture return value
+
+    // if (ret == -1) {
+    //     printf("Error: retcode = %d\n", ret);  // Debugging output before calling USAGE
+    //     USAGE(*argv, EXIT_FAILURE);
+    // }
+    // if (global_options & 0x1) {
+    //     USAGE(*argv, EXIT_SUCCESS);
+    // }
+    // return EXIT_SUCCESS;
+
 }
 
 /*

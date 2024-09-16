@@ -1,5 +1,6 @@
 #include "global.h"
 #include "debug.h"
+// #include <unistd.h>
 
 #ifdef _STRING_H
 #error "Do not #include <string.h>. You will get a ZERO."
@@ -150,6 +151,49 @@ int path_pop() {
     return 0;  // Success
 }
 
+int validheader(int req_record_type, int req_depth) {
+    // Validate the "magic" bytes
+    int m0 = fgetc(stdin);
+    int m1 = fgetc(stdin);
+    int m2 = fgetc(stdin);
+    if (m0 != 0x0C || m1 != 0x0D || m2 != 0xED) {
+        return -1;  // Invalid magic sequence
+    }
+
+    // Read and validate the record type
+    int record_type = fgetc(stdin);
+    if (record_type == EOF) {
+        return -1;
+    }
+
+    // Read and validate the depth (4-byte value)
+    unsigned long depth = 0;
+    for (int i = 3; i >= 0; i--) {
+        int c = fgetc(stdin);
+        if (c == EOF) {
+            return -1;
+        }
+        depth |= (unsigned long)c << (i * 8);
+    }
+
+    // Read and validate the record size (8-byte value)
+    unsigned long record_size = 0;
+    for (int i = 7; i >= 0; i--) {
+        int c = fgetc(stdin);
+        if (c == EOF) {
+            return -1;
+        }
+        record_size |= (unsigned long)c << (i * 8);
+    }
+
+    // Validate header fields
+    if (record_type == req_record_type && depth == (unsigned long)req_depth && record_size == 16) {
+        return 0;
+    }
+
+    return -1;
+}
+
 /*
  * @brief Deserialize directory contents into an existing directory.
  * @details  This function assumes that path_buf contains the name of an existing
@@ -169,7 +213,128 @@ int path_pop() {
  */
 int deserialize_directory(int depth) {
     // To be implemented.
-    abort();
+    // abort();
+    // int byte_read;
+    unsigned char magic_byte1, magic_byte2, magic_byte3;  // Separate variables for magic bytes
+    unsigned char record_type;
+    unsigned long read_depth = 0;
+    unsigned long record_size = 0;
+
+    // Validate the header at the start of the directory
+    if (validheader(2, depth) == -1) {
+        return -1;
+    }
+
+    while(1){
+        // Read and validate magic bytes
+        magic_byte1 = fgetc(stdin);
+        magic_byte2 = fgetc(stdin);
+        magic_byte3 = fgetc(stdin);
+        if (magic_byte1 != 0x0C || magic_byte2 != 0x0D || magic_byte3 != 0xED) {
+            return -1;  // Invalid magic sequence
+        }
+
+        // Read record type
+        record_type = fgetc(stdin);
+
+        // If we encounter the END_OF_DIRECTORY record, break the loop
+        if(record_type == 3) break;
+
+        // Ensure the record is a DIRECTORY_ENTRY
+        if (record_type != 4) {
+            return -1;  // Unexpected record type, return error
+        }
+
+        // Read and validate the depth (4-byte value)
+        for (int i = 3; i >= 0; i--) {
+            int byte = fgetc(stdin);
+            if (byte == EOF) {
+                return -1;
+            }
+            read_depth |= (unsigned long)byte << (i * 8);
+        }
+
+        // Read the record size (8-byte value)
+        for (int i = 7; i >= 0; i--) {
+            int byte = fgetc(stdin);
+            if (byte == EOF) {
+                return -1;
+            }
+            record_size |= (unsigned long)byte << (i * 8);
+        }
+
+
+
+        unsigned int mode = 0;
+        unsigned long long file_dir_size = 0;
+
+        // Read the mode (4-byte value)
+        for (int i = 0; i < 4; ++i) {
+            mode = (mode << 8) | (unsigned char)fgetc(stdin);
+        }
+
+        // Read the file/directory size (8-byte value)
+        for (int i = 0; i < 8; ++i) {
+            file_dir_size = (file_dir_size << 8) | (unsigned char)fgetc(stdin);
+        }
+
+        // Adjust the remaining size to accommodate the name length
+        record_size = record_size - 16 - 12;
+
+        // Read the name of the file or directory
+        char * name_ptr = name_buf;
+        if(record_size > NAME_MAX){
+            return -1;
+        }
+        while(record_size--){
+            int char_read = fgetc(stdin);
+            *name_ptr = char_read;
+            name_ptr++;
+        }
+        *name_ptr = '\0';
+
+        // Push the new name to the path buffer
+        if (path_push(name_buf) == -1) {
+            return -1;
+        }
+
+        // // Check for duplicate file or directory
+        // struct stat st;
+        // if(!stat(path_buf, &st)){
+        //     return -1;
+        // }
+
+        if(mode & S_IFDIR){
+            // Handle directory deserialization
+            if (mkdir(path_buf, 0700) == -1 && !(global_options & 0x8)) {
+                // Clobber flag is not set
+                return -1;
+            }
+
+            // Set the correct permissions for the directory
+            if(chmod(path_buf, mode & 0777) == -1){
+                return -1;
+            }
+
+            // Recursively deserialize the contents of the subdirectory
+            if(deserialize_directory(depth + 1) == -1){
+                return -1;
+            }
+        } else {
+            // Handle file deserialization
+            if(deserialize_file(depth) == -1){
+                return -1;
+            }
+
+            // Set the correct permissions for the file
+            if(chmod(path_buf, mode & 0777) == -1){
+                return -1;
+            }
+
+        }
+        path_pop();
+    }
+    return 0;
 }
 
 /*
@@ -191,7 +356,121 @@ int deserialize_directory(int depth) {
  */
 int deserialize_file(int depth) {
     // To be implemented.
-    abort();
+    // abort();
+    // Read and validate the "magic" bytes
+    int m0 = fgetc(stdin);
+    int m1 = fgetc(stdin);
+    int m2 = fgetc(stdin);
+    if (m0 != 0x0C || m1 != 0x0D || m2 != 0xED) {
+        return -1;  // Invalid magic sequence
+    }
+
+    // Read and validate the record type
+    int record_type = fgetc(stdin);
+    if (record_type == EOF) {
+        return -1;
+    }
+
+    if (record_type != 5) {
+        return -1;
+    }
+
+    // Read and validate the depth (4-byte value)
+    unsigned long read_depth = 0;
+    for (int i = 3; i >= 0; i--) {
+        int c = fgetc(stdin);
+        if (c == EOF) {
+            return -1;
+        }
+        read_depth |= (unsigned long)c << (i * 8);
+    }
+
+    if (read_depth != (unsigned long)depth) {
+        return -1;
+    }
+
+    // Read the record size (8-byte value)
+    unsigned long record_size = 0;
+    for (int i = 7; i >= 0; i--) {
+        int c = fgetc(stdin);
+        if (c == EOF) {
+            return -1;
+        }
+        record_size |= (unsigned long)c << (i * 8);
+    }
+
+    // Subtract the header size
+    record_size -= 16;
+    if (record_size < 0) {
+        return -1;
+    }
+
+    // Open the file for writing
+    FILE *f = fopen(path_buf, "w");
+    if (f == NULL) {
+        return -1;
+    }
+
+    // Write the file data
+    while (record_size > 0) {
+        int i = fgetc(stdin);
+        if (i == EOF) {
+            fclose(f);
+            return -1;
+        }
+        fputc(i, f);
+        record_size--;
+    }
+
+    fclose(f);
+    return 0;
+}
+
+
+// Write the magic sequence directly
+int write_magic() {
+    if (fputc(0x0C, stdout) == EOF ||
+        fputc(0x0D, stdout) == EOF ||
+        fputc(0xED, stdout) == EOF) {
+        return -1;
+    }
+    return 0;
+}
+
+// Helper function to write a header
+int write_header(unsigned char type, uint32_t depth, uint64_t size) {
+    if (write_magic() == -1) {
+        return -1;
+    }
+    if (fputc(type, stdout) == EOF) {
+        return -1;
+    }
+
+    // Writing depth (big-endian)
+    for (int i = 3; i >= 0; --i) {
+        if (fputc((depth >> (i * 8)) & 0xFF, stdout) == EOF) {
+            return -1;
+        }
+    }
+
+    // Writing size (big-endian)
+    for (int i = 7; i >= 0; --i) {
+        if (fputc((size >> (i * 8)) & 0xFF, stdout) == EOF) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+// Helper function to write a null-terminated string
+int write_string(const char *str) {
+    while (*str != '\0') {
+        if (fputc(*str++, stdout) == EOF) {
+            return -1;
+        }
+    }
+    return 0;
 }
 
 /*
@@ -213,7 +492,61 @@ int deserialize_file(int depth) {
  */
 int serialize_directory(int depth) {
     // To be implemented.
-    abort();
+    // abort();
+    DIR *dir = opendir(path_buf);
+    if (!dir) return -1;
+    depth++;
+
+    // Write START_OF_DIRECTORY header
+    if (write_header(2, depth, 16) == -1) return -1;
+
+    struct dirent *de;
+    while ((de = readdir(dir)) != NULL) {
+        // Skip "." and ".."
+        if (*(de->d_name) == '.' && (*(de->d_name + 1) == '\0' || *(de->d_name + 1) == '.')) {
+            continue;
+        }
+
+        if(path_push(de->d_name)==-1) return -1;
+
+        struct stat stat_buf;
+        if (stat(path_buf, &stat_buf) == -1) return -1;
+
+        // Write DIRECTORY_ENTRY header
+        uint64_t record_size = 16 + 12;  // Basic size of DIRECTORY_ENTRY record
+        const char *name = de->d_name;
+        while (*name++) record_size++;  // Calculate full record size
+        if (write_header(4, depth, record_size) == -1) return -1;
+
+        // Write metadata (file type/permissions and size)
+        for (int i = 3; i >= 0; --i) {
+            if (fputc((stat_buf.st_mode >> (i * 8)) & 0xFF, stdout) == EOF) return -1;
+        }
+
+        for (int i = 7; i >= 0; --i) {
+            if (fputc((stat_buf.st_size >> (i * 8)) & 0xFF, stdout) == EOF) return -1;
+        }
+
+        // Write file/directory name
+        if (write_string(de->d_name) == -1) return -1;
+
+        if (S_ISDIR(stat_buf.st_mode)) {
+            // Recurse into the directory
+            if (serialize_directory(depth) == -1) return -1;
+        } else {
+            // Serialize file
+            if (serialize_file(depth, stat_buf.st_size) == -1) return -1;
+        }
+
+        path_pop();
+    }
+
+    // Write END_OF_DIRECTORY header
+    if (write_header(3, depth, 16) == -1) return -1;
+    depth--;
+
+    closedir(dir);
+    return 0;
 }
 
 /*
@@ -231,7 +564,28 @@ int serialize_directory(int depth) {
  */
 int serialize_file(int depth, off_t size) {
     // To be implemented.
-    abort();
+    // abort();
+    // Write FILE_DATA header
+    if (write_header(5, depth, 16 + size) == -1) {
+        return -1;
+    }
+
+    // Open and write file contents
+    FILE *file = fopen(path_buf, "r");  // path_buf already holds the file name
+    if (!file) {
+        return -1;
+    }
+
+    int c;
+    while ((c = fgetc(file)) != EOF) {
+        if (fputc(c, stdout) == EOF) {
+            fclose(file);
+            return -1;
+        }
+    }
+
+    fclose(file);
+    return 0;
 }
 
 /**
@@ -248,7 +602,26 @@ int serialize_file(int depth, off_t size) {
  */
 int serialize() {
     // To be implemented.
-    abort();
+    // abort();
+    uint32_t depth = 0;
+    uint64_t size = 16;
+
+    // Write the START_OF_TRANSMISSION header
+    if (write_header(0, depth, size) == -1) {
+        return -1;
+    }
+
+    // Serialize the directory or file
+    if (serialize_directory(depth) == -1) {
+        return -1;
+    }
+
+    // Write the END_OF_TRANSMISSION header
+    if (write_header(1, depth, size) == -1) {
+        return -1;
+    }
+
+    return 0;
 }
 
 /**
@@ -266,7 +639,19 @@ int serialize() {
  */
 int deserialize() {
     // To be implemented.
-    abort();
+    // abort();
+    mkdir(path_buf, 0700); // Create Directory if it doesn't exist
+    int depth = 0;
+    if (validheader(0, depth) == -1) {
+        return -1;
+    }
+    if (deserialize_directory(depth + 1) == -1) {
+        return -1;
+    }
+    if (validheader(1, depth) == -1) {
+        return -1;
+    }
+    return 0;
 }
 
 /**
@@ -312,6 +697,7 @@ int validargs(int argc, char **argv)
     int deserialize = 0;
     int clobber = 0;
     int positional_done = 0;  // Track if positional arguments have been processed
+    int path_provided = 0;  // Track if '-p' was provided
 
     // Loop through all the arguments using pointer arithmetic
     for (char **arg_ptr = argv + 1; arg_ptr < argv + argc; arg_ptr++) {
@@ -339,8 +725,10 @@ int validargs(int argc, char **argv)
             clobber = 1;
         } else if (*arg == 'p') {
             positional_done = 1;  // Options have started
-            if (arg_ptr + 1 < argv + argc && **(arg_ptr + 1) != '-') {
-                arg_ptr++;  // Skip the directory argument
+            if (arg_ptr + 1 < argv + argc) {
+                path_provided = 1;
+                path_init(*(arg_ptr + 1));
+                arg_ptr++;
             } else {
                 return -1;  // '-p' provided but no directory argument
             }
@@ -368,6 +756,11 @@ int validargs(int argc, char **argv)
     }
     if (clobber) {
         global_options |= 0x8;  // Set the clobber flag
+    }
+
+    // If -p was not provided, initialize the path to the current directory
+    if (!path_provided) {
+        path_init(".");  // Set default path to current directory
     }
 
     return 0;  // Success
