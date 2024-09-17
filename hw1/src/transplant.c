@@ -238,29 +238,33 @@ int deserialize_directory(int depth) {
         record_type = fgetc(stdin);
 
         // If we encounter the END_OF_DIRECTORY record, break the loop
-        if(record_type == 3) break;
+        if(record_type == 3){
+            unsigned long header_depth = 0;
+            unsigned long header_size = 0;
+            for (int i = 0; i < 4; ++i) {
+                int byte=fgetc(stdin);
+                header_depth = (header_depth << 8) | (unsigned char)byte;
+            }
+            for (int i = 0; i < 8; ++i) {
+                int byte=fgetc(stdin);
+                header_size = (header_size << 8) | (unsigned char)byte;
+            }
+            break;
+        }
 
         // Ensure the record is a DIRECTORY_ENTRY
         if (record_type != 4) {
             return -1;  // Unexpected record type, return error
         }
 
-        // Read and validate the depth (4-byte value)
-        for (int i = 3; i >= 0; i--) {
+        for (int i = 0; i < 4; ++i) {
             int byte = fgetc(stdin);
-            if (byte == EOF) {
-                return -1;
-            }
-            read_depth |= (unsigned long)byte << (i * 8);
+            read_depth = (read_depth << 8) | (unsigned char)byte;
         }
 
-        // Read the record size (8-byte value)
-        for (int i = 7; i >= 0; i--) {
+        for (int i = 0; i < 8; ++i) {
             int byte = fgetc(stdin);
-            if (byte == EOF) {
-                return -1;
-            }
-            record_size |= (unsigned long)byte << (i * 8);
+            record_size = (record_size << 8) | (unsigned char)byte;
         }
 
 
@@ -270,12 +274,14 @@ int deserialize_directory(int depth) {
 
         // Read the mode (4-byte value)
         for (int i = 0; i < 4; ++i) {
-            mode = (mode << 8) | (unsigned char)fgetc(stdin);
+            int byte = fgetc(stdin);
+            mode = (mode << 8) | (unsigned char)byte;
         }
 
         // Read the file/directory size (8-byte value)
         for (int i = 0; i < 8; ++i) {
-            file_dir_size = (file_dir_size << 8) | (unsigned char)fgetc(stdin);
+            int byte = fgetc(stdin);
+            file_dir_size = (file_dir_size << 8) | (unsigned char)byte;
         }
 
         // Adjust the remaining size to accommodate the name length

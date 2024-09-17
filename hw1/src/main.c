@@ -26,9 +26,6 @@ int main(int argc, char **argv)
 
     // return EXIT_SUCCESS;
 
-
-
-// CURRENT IMPLEMENTATION
     int ret = validargs(argc, argv);
 
     if (ret == -1) {
@@ -53,22 +50,6 @@ int main(int argc, char **argv)
         // If you reach this point, the operation was successful
         return EXIT_SUCCESS;
     }
-
-
-
-// TODO: DELETE (TEST VALIDARGS)
-    // int ret;
-    // ret = validargs(argc, argv);  // Call validargs and capture return value
-
-    // if (ret == -1) {
-    //     printf("Error: retcode = %d\n", ret);  // Debugging output before calling USAGE
-    //     USAGE(*argv, EXIT_FAILURE);
-    // }
-    // if (global_options & 0x1) {
-    //     USAGE(*argv, EXIT_SUCCESS);
-    // }
-    // return EXIT_SUCCESS;
-
 }
 
 /*
