@@ -243,10 +243,16 @@ int deserialize_directory(int depth) {
             unsigned long header_size = 0;
             for (int i = 0; i < 4; ++i) {
                 int byte=fgetc(stdin);
+                if (byte == EOF) {
+                    return -1;
+                }
                 header_depth = (header_depth << 8) | (unsigned char)byte;
             }
             for (int i = 0; i < 8; ++i) {
                 int byte=fgetc(stdin);
+                if (byte == EOF) {
+                    return -1;
+                }
                 header_size = (header_size << 8) | (unsigned char)byte;
             }
             break;
@@ -259,11 +265,17 @@ int deserialize_directory(int depth) {
 
         for (int i = 0; i < 4; ++i) {
             int byte = fgetc(stdin);
+            if (byte == EOF) {
+                return -1;
+            }
             read_depth = (read_depth << 8) | (unsigned char)byte;
         }
 
         for (int i = 0; i < 8; ++i) {
             int byte = fgetc(stdin);
+            if (byte == EOF) {
+                return -1;
+            }
             record_size = (record_size << 8) | (unsigned char)byte;
         }
 
@@ -275,12 +287,18 @@ int deserialize_directory(int depth) {
         // Read the mode (4-byte value)
         for (int i = 0; i < 4; ++i) {
             int byte = fgetc(stdin);
+            if (byte == EOF) {
+                return -1;
+            }
             mode = (mode << 8) | (unsigned char)byte;
         }
 
         // Read the file/directory size (8-byte value)
         for (int i = 0; i < 8; ++i) {
             int byte = fgetc(stdin);
+            if (byte == EOF) {
+                return -1;
+            }
             file_dir_size = (file_dir_size << 8) | (unsigned char)byte;
         }
 
@@ -303,12 +321,6 @@ int deserialize_directory(int depth) {
         if (path_push(name_buf) == -1) {
             return -1;
         }
-
-        // // Check for duplicate file or directory
-        // struct stat st;
-        // if(!stat(path_buf, &st)){
-        //     return -1;
-        // }
 
         if(mode & S_IFDIR){
             // Handle directory deserialization
