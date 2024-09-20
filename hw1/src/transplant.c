@@ -222,6 +222,7 @@ int deserialize_directory(int depth) {
 
     // Validate the header at the start of the directory
     if (validheader(2, depth) == -1) {
+        fprintf(stderr, "Error: Invalid start of directory header.\n");
         return -1;
     }
 
@@ -231,6 +232,7 @@ int deserialize_directory(int depth) {
         magic_byte2 = fgetc(stdin);
         magic_byte3 = fgetc(stdin);
         if (magic_byte1 != 0x0C || magic_byte2 != 0x0D || magic_byte3 != 0xED) {
+            fprintf(stderr, "Error: Invalid magic bytes.\n");
             return -1;  // Invalid magic sequence
         }
 
@@ -244,6 +246,7 @@ int deserialize_directory(int depth) {
             for (int i = 0; i < 4; ++i) {
                 int byte=fgetc(stdin);
                 if (byte == EOF) {
+                    fprintf(stderr, "Error: Unexpected EOF while reading header depth.\n");
                     return -1;
                 }
                 header_depth = (header_depth << 8) | (unsigned char)byte;
@@ -251,6 +254,7 @@ int deserialize_directory(int depth) {
             for (int i = 0; i < 8; ++i) {
                 int byte=fgetc(stdin);
                 if (byte == EOF) {
+                    fprintf(stderr, "Error: Unexpected EOF while reading header size.\n");
                     return -1;
                 }
                 header_size = (header_size << 8) | (unsigned char)byte;
@@ -260,12 +264,14 @@ int deserialize_directory(int depth) {
 
         // Ensure the record is a DIRECTORY_ENTRY
         if (record_type != 4) {
+            fprintf(stderr, "Error: Unexpected record type.\n");
             return -1;  // Unexpected record type, return error
         }
 
         for (int i = 0; i < 4; ++i) {
             int byte = fgetc(stdin);
             if (byte == EOF) {
+                fprintf(stderr, "Error: Unexpected EOF while reading directory depth.\n");
                 return -1;
             }
             read_depth = (read_depth << 8) | (unsigned char)byte;
@@ -274,6 +280,7 @@ int deserialize_directory(int depth) {
         for (int i = 0; i < 8; ++i) {
             int byte = fgetc(stdin);
             if (byte == EOF) {
+                fprintf(stderr, "Error: Unexpected EOF while reading record size.\n");
                 return -1;
             }
             record_size = (record_size << 8) | (unsigned char)byte;
@@ -288,6 +295,7 @@ int deserialize_directory(int depth) {
         for (int i = 0; i < 4; ++i) {
             int byte = fgetc(stdin);
             if (byte == EOF) {
+                fprintf(stderr, "Error: Unexpected EOF while reading file mode.\n");
                 return -1;
             }
             mode = (mode << 8) | (unsigned char)byte;
@@ -297,6 +305,7 @@ int deserialize_directory(int depth) {
         for (int i = 0; i < 8; ++i) {
             int byte = fgetc(stdin);
             if (byte == EOF) {
+                fprintf(stderr, "Error: Unexpected EOF while reading size.\n");
                 return -1;
             }
             file_dir_size = (file_dir_size << 8) | (unsigned char)byte;
@@ -308,6 +317,7 @@ int deserialize_directory(int depth) {
         // Read the name of the file or directory
         char * name_ptr = name_buf;
         if(record_size > NAME_MAX){
+            fprintf(stderr, "Error: File name size exceeds NAME_MAX.\n");
             return -1;
         }
         while(record_size--){
@@ -319,6 +329,7 @@ int deserialize_directory(int depth) {
 
         // Push the new name to the path buffer
         if (path_push(name_buf) == -1) {
+            fprintf(stderr, "Error: Failed to push path.\n");
             return -1;
         }
 
@@ -326,26 +337,31 @@ int deserialize_directory(int depth) {
             // Handle directory deserialization
             if (mkdir(path_buf, 0700) == -1 && !(global_options & 0x8)) {
                 // Clobber flag is not set
+                fprintf(stderr, "Error: Failed to create directory.\n");
                 return -1;
             }
 
             // Set the correct permissions for the directory
             if(chmod(path_buf, mode & 0777) == -1){
+                fprintf(stderr, "Error: Failed to set permissions for directory.\n");
                 return -1;
             }
 
             // Recursively deserialize the contents of the subdirectory
             if(deserialize_directory(depth + 1) == -1){
+                fprintf(stderr, "Error: Failed to deserialize subdirectory.\n");
                 return -1;
             }
         } else {
             // Handle file deserialization
             if(deserialize_file(depth) == -1){
+                fprintf(stderr, "Error: Failed to deserialize file.\n");
                 return -1;
             }
 
             // Set the correct permissions for the file
             if(chmod(path_buf, mode & 0777) == -1){
+                fprintf(stderr, "Error: Failed to set permissions for file.\n");
                 return -1;
             }
 
@@ -512,11 +528,17 @@ int serialize_directory(int depth) {
     // To be implemented.
     // abort();
     DIR *dir = opendir(path_buf);
-    if (!dir) return -1;
+    if (!dir) {
+        fprintf(stderr, "Error: Failed to open directory.\n");
+        return -1;
+    }
     depth++;
 
     // Write START_OF_DIRECTORY header
-    if (write_header(2, depth, 16) == -1) return -1;
+    if (write_header(2, depth, 16) == -1) {
+        fprintf(stderr, "Error: Failed to write START_OF_DIRECTORY header at depth %d.\n", depth);
+        return -1;
+    }
 
     struct dirent *de;
     while ((de = readdir(dir)) != NULL) {
@@ -525,42 +547,69 @@ int serialize_directory(int depth) {
             continue;
         }
 
-        if(path_push(de->d_name)==-1) return -1;
+        if(path_push(de->d_name)==-1) {
+            fprintf(stderr, "Error: Failed to push path.\n");
+            return -1;
+        }
 
         struct stat stat_buf;
-        if (stat(path_buf, &stat_buf) == -1) return -1;
+        if (stat(path_buf, &stat_buf) == -1) {
+            fprintf(stderr, "Error: Failed to stat path.\n");
+            return -1;
+        }
 
         // Write DIRECTORY_ENTRY header
         uint64_t record_size = 16 + 12;  // Basic size of DIRECTORY_ENTRY record
         const char *name = de->d_name;
         while (*name++) record_size++;  // Calculate full record size
-        if (write_header(4, depth, record_size) == -1) return -1;
+        if (write_header(4, depth, record_size) == -1) {
+            fprintf(stderr, "Error: Failed to write DIRECTORY_ENTRY header.\n");
+            return -1;
+        }
 
         // Write metadata (file type/permissions and size)
         for (int i = 3; i >= 0; --i) {
-            if (fputc((stat_buf.st_mode >> (i * 8)) & 0xFF, stdout) == EOF) return -1;
+            if (fputc((stat_buf.st_mode >> (i * 8)) & 0xFF, stdout) == EOF) {
+                fprintf(stderr, "Error: Failed to write file type/permissions.\n");
+                return -1;
+            }
         }
 
         for (int i = 7; i >= 0; --i) {
-            if (fputc((stat_buf.st_size >> (i * 8)) & 0xFF, stdout) == EOF) return -1;
+            if (fputc((stat_buf.st_size >> (i * 8)) & 0xFF, stdout) == EOF) {
+                fprintf(stderr, "Error: Failed to write file size.\n");
+                return -1;
+            }
         }
 
         // Write file/directory name
-        if (write_string(de->d_name) == -1) return -1;
+        if (write_string(de->d_name) == -1) {
+            fprintf(stderr, "Error: Failed to write name.\n");
+            return -1;
+        }
 
         if (S_ISDIR(stat_buf.st_mode)) {
             // Recurse into the directory
-            if (serialize_directory(depth) == -1) return -1;
+            if (serialize_directory(depth) == -1) {
+                fprintf(stderr, "Error: Failed to serialize directory.\n");
+                return -1;
+            }
         } else {
             // Serialize file
-            if (serialize_file(depth, stat_buf.st_size) == -1) return -1;
+            if (serialize_file(depth, stat_buf.st_size) == -1) {
+                fprintf(stderr, "Error: Failed to serialize file.\n");
+                return -1;
+            }
         }
 
         path_pop();
     }
 
     // Write END_OF_DIRECTORY header
-    if (write_header(3, depth, 16) == -1) return -1;
+    if (write_header(3, depth, 16) == -1) {
+        fprintf(stderr, "Error: Failed to write END_OF_DIRECTORY header.\n");
+        return -1;
+    }
     depth--;
 
     closedir(dir);
@@ -626,6 +675,7 @@ int serialize() {
 
     // Write the START_OF_TRANSMISSION header
     if (write_header(0, depth, size) == -1) {
+        fprintf(stderr, "Error: Failed to write START_OF_TRANSMISSION header.\n");
         return -1;
     }
 
@@ -636,6 +686,7 @@ int serialize() {
 
     // Write the END_OF_TRANSMISSION header
     if (write_header(1, depth, size) == -1) {
+        fprintf(stderr, "Error: Failed to write END_OF_TRANSMISSION header.\n");
         return -1;
     }
 
@@ -661,12 +712,14 @@ int deserialize() {
     mkdir(path_buf, 0700); // Create Directory if it doesn't exist
     int depth = 0;
     if (validheader(0, depth) == -1) {
+        fprintf(stderr, "Error: Invalid header.\n");
         return -1;
     }
     if (deserialize_directory(depth + 1) == -1) {
         return -1;
     }
     if (validheader(1, depth) == -1) {
+        fprintf(stderr, "Error: Invalid header.\n");
         return -1;
     }
     return 0;
@@ -698,6 +751,7 @@ int validargs(int argc, char **argv)
 
     // If there are no command-line arguments passed, return an error
     if (argc == 1) {
+        fprintf(stderr, "Error: No arguments provided.\n");
         return -1;  // No arguments provided
     }
 
@@ -722,6 +776,7 @@ int validargs(int argc, char **argv)
         arg = *arg_ptr;  // Current argument
 
         if (*arg != '-') {
+            fprintf(stderr, "Error: Arguments must start with '-'.\n");
             return -1;  // Invalid argument (must start with '-')
         }
 
@@ -730,11 +785,13 @@ int validargs(int argc, char **argv)
         // Handle positional arguments
         if (*arg == 's' && *(arg + 1) == '\0') {
             if (positional_done) {
+                fprintf(stderr, "Error: Positional argument '-s' not allowed after options.\n");
                 return -1;  // No positional arguments allowed after options
             }
             serialize = 1;
         } else if (*arg == 'd' && *(arg + 1) == '\0') {
             if (positional_done) {
+                fprintf(stderr, "Error: Positional argument '-d' not allowed after options.\n");
                 return -1;
             }
             deserialize = 1;
@@ -748,20 +805,24 @@ int validargs(int argc, char **argv)
                 path_init(*(arg_ptr + 1));
                 arg_ptr++;
             } else {
+                fprintf(stderr, "Error: '-p' option requires a directory path argument.\n");
                 return -1;  // '-p' provided but no directory argument
             }
         } else {
+            fprintf(stderr, "Error: Unrecognized argument.\n");
             return -1;  // Unrecognized argument
         }
     }
 
     // Enforce that either '-s' or '-d' must be provided, but not both
     if ((serialize && deserialize) || (!serialize && !deserialize)) {
+        fprintf(stderr, "Error: Must specify either '-s' (serialize) or '-d' (deserialize), but not both.\n");
         return -1;
     }
 
     // '-c' (clobber) is only valid if '-d' (deserialize) is provided
     if (clobber && !deserialize) {
+        fprintf(stderr, "Error: The '-c' option can only be used with '-d' (deserialize).\n");
         return -1;
     }
 
