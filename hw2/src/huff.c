@@ -689,13 +689,26 @@ int validargs(int argc, char **argv)
     if(argc == 4)   {
         //if the 2nd argument is -c and the 3rd argument is -b
         if(strequal(*(argv+1), "-c") && strequal(*(argv+2), "-b"))  {
+
             //while the 4th argument is not null and is betwen 0 and 9
+            // int blocksize = 0;
+            // while(**(argv+3) != '\0' && **(argv+3) >= '0' && **(argv+3) <= '9')    {
+            //     //multiply blocksize by 10 and add the new number to it by
+            //     //by subtracting the ascii value of '0' from it
+            //     blocksize = blocksize * 10 + **(argv+3) - '0';
+            //     (*(argv+3))++;
+            // }
+
+            char *blocksize_str = *(argv + 3);
             int blocksize = 0;
-            while(**(argv+3) != '\0' && **(argv+3) >= '0' && **(argv+3) <= '9')    {
-                //multiply blocksize by 10 and add the new number to it by
-                //by subtracting the ascii value of '0' from it
-                blocksize = blocksize * 10 + **(argv+3) - '0';
-                (*(argv+3))++;
+
+            // Validate if the blocksize string consists of only digits
+            while (*blocksize_str != '\0') {
+                if (*blocksize_str < '0' || *blocksize_str > '9') {
+                    return -1;  // Invalid character found, return -1
+                }
+                blocksize = blocksize * 10 + (*blocksize_str - '0');
+                blocksize_str++;
             }
 
             //if blocksize is not within bounds, return -1
