@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include "global.h"
 #include "huff.h"
@@ -108,6 +109,9 @@ void emit_huffman_tree() {
 
 //helper method to traverse tree and set its node's parents
 static void set_parents(NODE* root)   {
+    if (root == NULL) {
+        return;
+    }
     //if left is not null, set left's parent as root and recursive call set_parents
     if(root->left != NULL)  {
         root->left->parent = root;
@@ -288,6 +292,7 @@ static void construct_histogram(int blocksize)  {
         if(newsymbol == 1)  {
             NODE a;
             a.symbol = *(current_block+i);
+            a.weight = 1;
             a.parent = NULL;
             a.left = NULL;
             a.right = NULL;
@@ -297,7 +302,9 @@ static void construct_histogram(int blocksize)  {
     }
     //we make an node to represent end of file
     NODE a;
-    a.symbol = -1;
+    // a.symbol = -1;
+    a.symbol = 256;
+    a.weight = 0;
     a.parent = NULL;
     a.left = NULL;
     a.right = NULL;
@@ -309,81 +316,158 @@ static void construct_histogram(int blocksize)  {
 
 //helper method to construct a huffman tree from the histogram
 static void construct_huffmantree()    {
-    //gets the total number of nodes using our leaves
+    // //gets the total number of nodes using our leaves
+    // int totalnodes = num_nodes * 2 - 1;
+    // //position to place minimum nodes for the huffman tree
+    // int position = totalnodes - 1;
+    // //current number of nodes whose position is not decided in the huffman tree
+    // int currunsorted = num_nodes;
+    // //while there is more than 1 unsorted node
+    // while(currunsorted > 1) {
+    //     //minimum weight nodes
+    //     int min1 = nodes->weight;
+    //     int min2 = (nodes+1)->weight;
+    //     int node1 = 0;
+    //     int node2 = 1;
+    //     //loop through current undecided nodes
+    //     for(int i = 2; i < currunsorted; i++)   {
+    //         //if current node's weight >= both min1 and min2 we continue
+    //         if((nodes+i)->weight >= min1 && (nodes+i)->weight >= min2)
+    //             continue;
+    //         //if the current node is less than both min1 and min2
+    //         else if((nodes+i)->weight < min1 && (nodes+i)->weight < min2)    {
+    //             if(min1 < min2) {
+    //                 min2 = (nodes+i)->weight;
+    //                 node2 = i;
+    //             }
+    //             else    {
+    //                 min1 = (nodes+i)->weight;
+    //                 node1 = i;
+    //             }
+    //         }
+    //         //if current node < min1 but >= min2, set min1 to current node's weight
+    //         else if((nodes+i)->weight < min1 && (nodes+i)->weight >= min2)  {
+    //             min1 = (nodes+i)->weight;
+    //             node1 = i;
+    //         }
+    //         //else set min2 to current node's weight
+    //         else    {
+    //             min2 = (nodes+i)->weight;
+    //             node2 = i;
+    //         }
+    //     }
+    //     //move the minimum nodes the "high end" region of the array
+    //     *(nodes+position) = *(nodes+node2);
+    //     position--;
+    //     *(nodes+position) = *(nodes+node1);
+    //     position--;
+
+    //     //create a new internal node with the 2 minimum nodes as its children
+    //     NODE a;
+    //     a.parent = NULL;
+    //     a.symbol = -1;
+    //     a.left = (nodes+position+1);
+    //     a.right = (nodes+position+2);
+    //     //set a's weight to the sum of its children
+    //     a.weight = (nodes+position+1)->weight + (nodes+position+2)->weight;
+
+
+    //     //insert a to the section of unsorted nodes taking the lefter node's position
+    //     int max = 0;
+    //     if(node1 < node2)   {
+    //         *(nodes+node1) = a;
+    //         max = node2;
+    //     }
+    //     else    {
+    //         *(nodes+node2) = a;
+    //         max = node1;
+    //     }
+    //     //decrement currunsorted
+    //     currunsorted--;
+    //     //if currunsorted is not node1 or node2, we shift the leftmost node to node1 or node2
+    //     if(currunsorted != node1 && currunsorted != node2)
+    //         *(nodes+max) = *(nodes+currunsorted);
+
+    // }
+    // //set num_nodes to the current total nodes
+    // num_nodes = totalnodes;
+    // print_huffman_tree(nodes, 0);
+    // return;
+
+    // Total nodes required for the Huffman tree: (num_nodes * 2 - 1)
     int totalnodes = num_nodes * 2 - 1;
-    //position to place minimum nodes for the huffman tree
+    // Position to place minimum nodes at the end of the array
     int position = totalnodes - 1;
-    //current number of nodes whose position is not decided in the huffman tree
+    // Current number of nodes whose position is not decided in the Huffman tree
     int currunsorted = num_nodes;
-    //while there is more than 1 unsorted node
-    while(currunsorted > 1) {
-        //minimum weight nodes
-        int min1 = nodes->weight;
-        int min2 = (nodes+1)->weight;
-        int node1 = 0;
-        int node2 = 1;
-        //loop through current undecided nodes
-        for(int i = 2; i < currunsorted; i++)   {
-            //if current node's weight >= both min1 and min2 we continue
-            if((nodes+i)->weight >= min1 && (nodes+i)->weight >= min2)
-                continue;
-            //if the current node is less than both min1 and min2
-            else if((nodes+i)->weight < min1 && (nodes+i)->weight < min2)    {
-                if(min1 < min2) {
-                    min2 = (nodes+i)->weight;
-                    node2 = i;
-                }
-                else    {
-                    min1 = (nodes+i)->weight;
-                    node1 = i;
-                }
-            }
-            //if current node < min1 but >= min2, set min1 to current node's weight
-            else if((nodes+i)->weight < min1 && (nodes+i)->weight >= min2)  {
-                min1 = (nodes+i)->weight;
+
+    // While there are more than 1 unsorted node
+    while (currunsorted > 1) {
+        // Initialize min1 and min2 to large values to find the two smallest nodes
+        int node1 = -1, node2 = -1;
+        int min1 = INT_MAX, min2 = INT_MAX;
+
+        // Loop through the current unsorted nodes
+        for (int i = 0; i < currunsorted; i++) {
+            int weight = (nodes + i)->weight;
+
+            // If current node's weight is smaller than min1, update min2 and min1
+            if (weight < min1) {
+                min2 = min1;
+                node2 = node1;
+                min1 = weight;
                 node1 = i;
             }
-            //else set min2 to current node's weight
-            else    {
-                min2 = (nodes+i)->weight;
+            // If current node's weight is smaller than min2 but larger than min1
+            else if (weight < min2) {
+                min2 = weight;
                 node2 = i;
             }
         }
-        //move the minimum nodes the "high end" region of the array
-        *(nodes+position) = *(nodes+node2);
+
+        // Move the minimum nodes to the "high end" region of the array
+        *(nodes + position) = *(nodes + node2);
         position--;
-        *(nodes+position) = *(nodes+node1);
+        *(nodes + position) = *(nodes + node1);
         position--;
 
-        //create a new internal node with the 2 minimum nodes as its children
+        // Create a new internal node with the two minimum nodes as its children
         NODE a;
+        a.symbol = -1;  // Internal nodes have no symbol
         a.parent = NULL;
-        a.symbol = -1;
-        a.left = (nodes+position+1);
-        a.right = (nodes+position+2);
-        //set a's weight to the sum of its children
-        a.weight = (nodes+position+1)->weight + (nodes+position+2)->weight;
+        // a.left = (nodes + position + 1);
+        // a.right = (nodes + position + 2);
+        // a.weight = (nodes + position + 1)->weight + (nodes + position + 2)->weight;  // Sum of children weights
 
+        // Assign children based on their weights
+        if ((nodes + position + 1)->weight < (nodes + position + 2)->weight) {
+            a.left = (nodes + position + 1);
+            a.right = (nodes + position + 2);
+        } else {
+            a.left = (nodes + position + 2);
+            a.right = (nodes + position + 1);
+        }
+        a.weight = (nodes + position + 1)->weight + (nodes + position + 2)->weight;  // Sum of children weights
 
-        //insert a to the section of unsorted nodes taking the lefter node's position
-        int max = 0;
-        if(node1 < node2)   {
-            *(nodes+node1) = a;
-            max = node2;
+        // Insert the new internal node into the section of unsorted nodes
+        if (node1 < node2) {
+            *(nodes + node1) = a;
+        } else {
+            *(nodes + node2) = a;
         }
-        else    {
-            *(nodes+node2) = a;
-            max = node1;
-        }
-        //decrement currunsorted
+
+        // Decrease the number of unsorted nodes
         currunsorted--;
-        //if currunsorted is not node1 or node2, we shift the leftmost node to node1 or node2
-        if(currunsorted != node1 && currunsorted != node2)
-            *(nodes+max) = *(nodes+currunsorted);
 
+        // If currunsorted is not node1 or node2, shift the leftmost node to node1 or node2
+        if (currunsorted != node1 && currunsorted != node2) {
+            *(nodes + ((node1 < node2) ? node2 : node1)) = *(nodes + currunsorted);
+        }
     }
-    //set num_nodes to the current total nodes
+
+    // Update num_nodes to the total number of nodes
     num_nodes = totalnodes;
+
     return;
 }
 
@@ -460,8 +544,9 @@ int compress_block() {
     int blocksize = ((unsigned int) global_options >> 16) + 1;
     int read = 0;
     //if EOF at beginning of block return error
-    if(feof(stdin))
+    if(feof(stdin)){
         return -1;
+    }
     //reading 1 block of data from stdin to array current_block
     for(; read < blocksize; read++)  {
         //get char then put in array block_size
@@ -479,9 +564,15 @@ int compress_block() {
     
     //read will be the same as block_size or end block
     blocksize = read;
+
     //if blocksize <= 0 it is an error so return -1
-    if(blocksize <= 0)
-        return -1;
+    // if(blocksize <= 0){
+    //     return -1;
+    // }
+
+    if(blocksize == 0){
+        return 0;
+    }
 
     //we use blocksize to keep track of EOF or end of block
     //constructs a histogram from the buffer
