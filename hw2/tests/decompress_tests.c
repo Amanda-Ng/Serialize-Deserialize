@@ -284,7 +284,7 @@ Test(decompress_test_suite, decompress_block_empty, .timeout = 5){
 	FILE *fout = open_output_file(out);
 
 	int ret = decompress_block();
-	int exp_ret = -1;
+	int exp_ret = 1;
 	cr_assert_eq(ret, exp_ret, "Invalid return for decompress block. Got %d | Expected: %d", ret, exp_ret);
 }
 

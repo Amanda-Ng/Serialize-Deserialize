@@ -623,7 +623,8 @@ int compress_block() {
  * produced by compress().  If EOF is encountered before a complete block has
  * been read, it is an error.
  *
- * @return 0 if decompression completes without error, -1 if an error occurs.
+ * @return 0 if a block is successfully read and decompressed, 1 if EOF is
+ * encountered at the start of a block, otherwise -1 if an error occurs.
  */
 int decompress_block() {
     //read huffman tree

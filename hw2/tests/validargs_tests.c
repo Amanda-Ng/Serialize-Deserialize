@@ -98,13 +98,13 @@ Test(validargs_test_suite, validargs_compress_invalid_block_test1, .timeout = 5)
 	cr_expect_eq(ret, exp_ret, "Invalid return for valid args. Got %d | Expected: %d", ret, exp_ret);
 
 	global_options = 0;
-	argv1[3] = "8332T";
-	ret = validargs(argc, argv1);
+	char *argv2[] = {"bin/huff", "-c", "-b", "8332T", NULL};
+	ret = validargs(argc, argv2);
 	cr_expect_eq(ret, exp_ret, "Invalid return for valid args. Got %d | Expected: %d", ret, exp_ret);
 
 	global_options = 0;
-	argv1[3] = "\n!./|";
-	ret = validargs(argc, argv1);
+	char *argv3[] = {"bin/huff", "-c", "-b", "\n!./|", NULL};
+	ret = validargs(argc, argv3);
 	cr_expect_eq(ret, exp_ret, "Invalid return for valid args. Got %d | Expected: %d", ret, exp_ret);
 }
 
