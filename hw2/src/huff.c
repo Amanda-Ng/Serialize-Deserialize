@@ -192,6 +192,11 @@ int read_huffman_tree() {
     num_nodes = *current_block << 8;
     num_nodes += *(current_block+1);
 
+    // Check for invalid num_nodes values
+    if (num_nodes < 3) {
+        return -1; // Invalid Huffman tree with less than 3 nodes
+    }
+
     int n = 0;
     //the number of bytes representing the tree
     if(num_nodes % 8 == 0)
@@ -630,6 +635,11 @@ int decompress_block() {
     //read huffman tree
     int q = read_huffman_tree();
     //if return is not 0 then it is an error
+
+    if (q == 1) {
+        return 1;  // Signal that EOF was reached
+    }
+
     if(q != 0)
         return -1;
 
@@ -721,13 +731,27 @@ int decompress() {
     //while not at EOF, call decompress_block
     int error = 0;
     int decompressed = 0;
-    while(feof(stdin) == 0)  {
+    // while(feof(stdin) == 0)  {
+    //     error = decompress_block();
+    //     //if decompress_block returns -1 and we have no decompressed blocks, return -1
+    //     if(error && decompressed == 0)
+    //         return -1;
+    //     decompressed++;
+    // }
+
+    while (1) {
         error = decompress_block();
-        //if decompress_block returns -1 and we have no decompressed blocks, return -1
-        if(error && decompressed == 0)
+        // If EOF encountered, exit loop
+        if (error == 1) {
+            break;
+        }
+        // If decompress_block returns an error and no decompressed data, return -1
+        if (error == -1 && decompressed == 0) {
             return -1;
+        }
         decompressed++;
     }
+
     //if error return -1
     if(ferror(stdin))
         return -1;
