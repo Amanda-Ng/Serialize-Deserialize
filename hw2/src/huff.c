@@ -165,15 +165,29 @@ static NODE *findnode(int c) {
 int read_huffman_tree() {
     //if EOF at beginning of block return error
     if(feof(stdin))
-        return -1;
+        return 1;
     //reading 2 bytes first
     unsigned char* currblockptr = current_block;
-    for(int i = 0; i < 2; i++)  {
-        *currblockptr++ = fgetc(stdin);
-        //if end of file or error, return -1
-        if(feof(stdin) || ferror(stdin))
-            return -1;
+    // for(int i = 0; i < 2; i++)  {
+    //     *currblockptr++ = fgetc(stdin);
+    //     //if end of file or error, return -1
+    //     if(feof(stdin) || ferror(stdin))
+    //         return -1;
+    // }
+
+    for (int i = 0; i < 2; i++) {
+        int c = fgetc(stdin);
+        if (c == EOF) {
+            // Check if it's EOF at the start of reading (not an error)
+            if (i == 0) {
+                return 1;  // Return 1 when EOF is encountered at the start
+            } else {
+                return -1;  // Return -1 for any other error
+            }
+        }
+        *currblockptr++ = (unsigned char)c;
     }
+
     //the first 2 bytes read will be num_nodes
     num_nodes = *current_block << 8;
     num_nodes += *(current_block+1);
@@ -218,6 +232,11 @@ int read_huffman_tree() {
             //the back of the nodes array, and create a new node with those
             //nodes as its children
             else    {
+
+                if (stackptr - nodes < 2) {  // Stack underflow check
+                    return -1;  // Invalid tree, not enough nodes
+                }
+
                 stackptr--;
                 NODE R = *stackptr;
                 stackptr--;
