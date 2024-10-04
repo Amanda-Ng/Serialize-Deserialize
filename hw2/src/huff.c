@@ -33,7 +33,7 @@ static void postorder(NODE* root, unsigned char* out, int* count) {
     //if count = 8, out is filled up so we output it and reset
     if(*count == 8)  {
         fputc(*out, stdout);
-        fflush(stdout);
+        // fflush(stdout);
         *out = 0;
         *count = 0;
     }
@@ -55,19 +55,19 @@ static void symboltraversal(NODE* root) {
         if(root->symbol == 256) {
             fputc(0xFF, stdout);
             fputc(0x00, stdout);
-            fflush(stdout);
+            // fflush(stdout);
         }
         //if symbol is 0xFF, we out put 0xFF and any byte other than 0x00. I will
         //output 0xFF twice
         else if(root->symbol == 255)    {
             fputc(0xFF, stdout);
             fputc(0xFF, stdout);
-            fflush(stdout);
+            // fflush(stdout);
         }
         //else we output its symbol normally
         else    {
             fputc(root->symbol, stdout);
-            fflush(stdout);
+            // fflush(stdout);
         }
     }
     return;
@@ -87,7 +87,7 @@ void emit_huffman_tree() {
     lsb = num_nodes & 0xFF;
     fputc(msb, stdout);
     fputc(lsb, stdout);
-    fflush(stdout);
+    // fflush(stdout);
 
     //a sequence of n bits from a postorder traversal (0 = leaf, 1 = internal node)
     unsigned char out = 0;
@@ -97,7 +97,7 @@ void emit_huffman_tree() {
     if(count != 0)  {
         out = out << (8 - count);
         fputc(out, stdout);
-        fflush(stdout);
+        // fflush(stdout);
     }
 
     //a sequence of bytes that gives the values of the symbols at the (n+1)/2
@@ -532,7 +532,7 @@ static void outputcompressed(int blocksize)    {
             //reset count to 0
             if(count == 8)  {
                 fputc(out, stdout);
-                fflush(stdout);
+                // fflush(stdout);
                 count = 0;
             }
 
@@ -547,7 +547,7 @@ static void outputcompressed(int blocksize)    {
     //we pad the last byte with 0s if it hasn't filled all 8 bits
     out = out << (8 - count);
     fputc(out, stdout);
-    fflush(stdout);
+    // fflush(stdout);
 
     return;
 }
@@ -682,7 +682,7 @@ int decompress_block() {
         
         //we output the symbol
         fputc(a->symbol, stdout);
-        fflush(stdout);
+        // fflush(stdout);
     }
 
     return 0;

@@ -19,7 +19,7 @@ TEST_OBJF := $(shell find $(TSTD) -type f -name *.o)
 
 INC := -I $(INCD)
 
-CFLAGS := -Wall -Werror -Wno-unused-variable -Wno-unused-function -MMD -fcommon
+CFLAGS := -Wall -Werror -Wno-unused-variable -Wno-unused-function -MMD -fcommon -O3
 COLORF := -DCOLOR
 DFLAGS := -g -DDEBUG -DCOLOR
 PGFLAGS := -g -pg
