@@ -205,3 +205,89 @@ Test(sfmm_basecode_suite, realloc_smaller_block_free_block, .timeout = TEST_TIME
 
 //Test(sfmm_student_suite, student_test_1, .timeout = TEST_TIMEOUT) {
 //}
+
+
+Test(sfmm_student_suite, malloc_exact_page_size, .timeout = TEST_TIMEOUT) {
+    sf_errno = 0;
+    // Allocating exactly a page size worth of memory.
+    void *x = sf_malloc(PAGE_SZ - sizeof(sf_block));
+    cr_assert_not_null(x, "sf_malloc for exact page size returned NULL!");
+
+    // Only one free block should remain (the remainder of any padding).
+    assert_free_block_count(0, 1);
+
+    cr_assert(sf_errno == 0, "sf_errno should be 0 after allocating exact page size!");
+}
+
+Test(sfmm_student_suite, free_after_realloc, .timeout = TEST_TIMEOUT) {
+    sf_errno = 0;
+    size_t sz = 64;
+    void *x = sf_malloc(sz);
+    cr_assert_not_null(x, "sf_malloc failed for size 64!");
+
+    // Reallocate to a different size.
+    x = sf_realloc(x, sz * 2);
+    cr_assert_not_null(x, "sf_realloc failed for a larger size!");
+
+    // Free the reallocated memory.
+    sf_free(x);
+
+    // Check the free list count to ensure proper coalescing.
+    assert_free_block_count(0, 1);
+    cr_assert(sf_errno == 0, "sf_errno should be 0 after free!");
+}
+
+Test(sfmm_student_suite, malloc_more_than_page_size, .timeout = TEST_TIMEOUT) {
+    sf_errno = 0;
+    // Allocate more than a page size worth of memory.
+    void *x = sf_malloc(PAGE_SZ + 64);
+    cr_assert_not_null(x, "sf_malloc failed for more than a page size!");
+
+    // Only one free block should remain.
+    assert_free_block_count(0, 1);
+
+    // Ensure that no error occurred.
+    cr_assert(sf_errno == 0, "sf_errno should be 0 after allocating more than a page!");
+}
+
+Test(sfmm_student_suite, free_with_coalescing, .timeout = TEST_TIMEOUT) {
+    sf_errno = 0;
+    size_t sz_x = 64, sz_y = 128, sz_z = 64;
+    void *x = sf_malloc(sz_x);
+    void *y = sf_malloc(sz_y);
+    void *z = sf_malloc(sz_z);
+
+    cr_assert_not_null(x, "sf_malloc failed for x!");
+    cr_assert_not_null(y, "sf_malloc failed for y!");
+    cr_assert_not_null(z, "sf_malloc failed for z!");
+
+    // Free memory in reverse order to trigger coalescing.
+    sf_free(z);
+    sf_free(y);
+    sf_free(x);
+
+    // After coalescing, only one large free block should remain.
+    assert_free_block_count(0, 1);
+
+    cr_assert(sf_errno == 0, "sf_errno should be 0 after coalescing free blocks!");
+}
+
+Test(sfmm_student_suite, free_after_realloc_three_pages, .timeout = TEST_TIMEOUT) {
+    sf_errno = 0;
+
+    // Allocate memory equivalent to three pages.
+    size_t sz = 3 * PAGE_SZ - sizeof(sf_block);
+    void *x = sf_malloc(sz);
+    cr_assert_not_null(x, "sf_malloc failed for three pages of memory!");
+
+    // Reallocate to a smaller size (half of the original size).
+    x = sf_realloc(x, sz / 2);
+    cr_assert_not_null(x, "sf_realloc failed for smaller size!");
+
+    // Free the reallocated memory.
+    sf_free(x);
+
+    // Check the free list count to ensure proper coalescing.
+    assert_free_block_count(0, 1);
+    cr_assert(sf_errno == 0, "sf_errno should be 0 after free!");
+}
