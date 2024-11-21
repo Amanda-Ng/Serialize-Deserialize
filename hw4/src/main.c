@@ -55,6 +55,6 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    unparse_cookbook(cbp, stdout);
+    // unparse_cookbook(cbp, stdout);
     exit(0);
 }
