@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include "debug.h"
 #include "cookbook.h"
 #include "cook.h"
@@ -229,15 +230,18 @@ void free_task(TASK *task) {
     }
 }
 
-// Function to free recipe links
-void free_recipe_links(RECIPE_LINK *link) {
+// Function to free recipe links with ownership rule
+void free_recipe_links(RECIPE_LINK *link, bool owns_name) {
     while (link != NULL) {
         RECIPE_LINK *next_link = link->next;
 
-        // Free the link name
-        free(link->name);
+        // Free the link name only if this list owns it
+        if (owns_name && link->name != NULL) {
+            free(link->name);
+            link->name = NULL;  // Nullify the pointer to avoid double-freeing
+        }
 
-        free(link);
+        free(link);  // Free the link structure itself
         link = next_link;
     }
 }
@@ -251,8 +255,9 @@ void free_recipes(RECIPE *recipe) {
         free(recipe->name);
 
         // Free the dependency lists
-        free_recipe_links(recipe->this_depends_on);
-        free_recipe_links(recipe->depend_on_this);
+        // Assume 'this_depends_on' owns the names and 'depend_on_this' does not
+        free_recipe_links(recipe->this_depends_on, true);  // Free names here
+        free_recipe_links(recipe->depend_on_this, false);  // Don't free names here
 
         // Free tasks in the recipe
         free_task(recipe->tasks);
@@ -261,6 +266,7 @@ void free_recipes(RECIPE *recipe) {
         // free(recipe->state);
         // Only free state if it is not NULL
 
+        // Free the recipe itself
         free(recipe);
         recipe = next_recipe;
     }
